@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -56,11 +56,11 @@ class Entity(BaseModel):
 
     id: str
     name: str
-    aliases: list[str] = Field(default_factory=list)
+    aliases: List[str] = Field(default_factory=list)
     description: str = ""
     entity_type: EntityType = EntityType.UNKNOWN
-    properties: dict[str, Any] = Field(default_factory=dict)
-    embedding: Optional[list[float]] = None
+    properties: Dict[str, Any] = Field(default_factory=dict)
+    embedding: Optional[List[float]] = None
 
     def __hash__(self) -> int:
         return hash(self.id)
@@ -89,7 +89,7 @@ class Relation(BaseModel):
     description: str = ""
     relation_type: RelationType = RelationType.OTHER
     inverse_id: Optional[str] = None
-    properties: dict[str, Any] = Field(default_factory=dict)
+    properties: Dict[str, Any] = Field(default_factory=dict)
 
     def __hash__(self) -> int:
         return hash(self.id)
@@ -105,22 +105,30 @@ class Triple(BaseModel):
     Represents a triple (subject, predicate, object) in a knowledge graph.
 
     This is the fundamental unit of knowledge in a KG.
+
+    Attributes:
+        subject: The subject entity or its ID
+        predicate: The relation/predicate or its ID
+        object: The object entity, ID, or literal value
+        confidence: Confidence score for the triple (0-1)
+        source: Origin of the triple (e.g., "wikidata", "extracted")
+        metadata: Additional information about the triple
     """
 
     model_config = ConfigDict(extra="allow")
 
-    subject: str | Entity = ""
-    predicate: str | Relation = ""
-    object: str | Entity = ""
+    subject: Union[str, Entity] = ""
+    predicate: Union[str, Relation] = ""
+    object: Union[str, Entity] = ""
     confidence: float = 1.0
     source: str = ""
-    metadata: dict[str, Any] = Field(default_factory=dict)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
     def __init__(
         self,
-        subject: str | Entity | None = None,
-        predicate: str | Relation | None = None,
-        object: str | Entity | None = None,
+        subject: Optional[Union[str, Entity]] = None,
+        predicate: Optional[Union[str, Relation]] = None,
+        object: Optional[Union[str, Entity]] = None,
         **data: Any,
     ) -> None:
         """Allow positional arguments for subject, predicate, object."""
@@ -134,20 +142,25 @@ class Triple(BaseModel):
 
     @property
     def subject_id(self) -> str:
+        """Get subject ID regardless of whether it's an Entity or string."""
         return self.subject.id if isinstance(self.subject, Entity) else self.subject
 
     @property
     def predicate_id(self) -> str:
+        """Get predicate ID regardless of whether it's a Relation or string."""
         return self.predicate.id if isinstance(self.predicate, Relation) else self.predicate
 
     @property
     def object_id(self) -> str:
+        """Get object ID regardless of whether it's an Entity or string."""
         return self.object.id if isinstance(self.object, Entity) else self.object
 
     def to_tuple(self) -> tuple[str, str, str]:
+        """Convert to simple tuple of IDs."""
         return (self.subject_id, self.predicate_id, self.object_id)
 
     def to_text(self) -> str:
+        """Convert to human-readable text."""
         subj = self.subject.name if isinstance(self.subject, Entity) else self.subject
         pred = self.predicate.name if isinstance(self.predicate, Relation) else self.predicate
         obj = self.object.name if isinstance(self.object, Entity) else self.object
